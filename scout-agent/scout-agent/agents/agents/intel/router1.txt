@@ -1,0 +1,93 @@
+import axios from 'axios';
+
+// ─── Detect if input is a URL or a name ──────────────────────────────────────
+export const detectInputType = (input) => {
+  try {
+    new URL(input);
+    return 'url';
+  } catch {
+    return 'name';
+  }
+};
+
+// ─── Search for hackathon URL by name ────────────────────────────────────────
+const SEARCH_ENGINES = [
+  (query) => `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
+];
+
+const extractUrlsFromHtml = (html, query) => {
+  // Extract href links that look like hackathon pages
+  const urlPattern = /href="(https?:\/\/[^"]+)"/g;
+  const matches = [];
+  let match;
+
+  const keywords = ['devpost', 'devfolio', 'hackerearth', 'unstop', 'mlh', 'hackathon'];
+
+  while ((match = urlPattern.exec(html)) !== null) {
+    const url = match[1];
+    // Filter out search engine internal links
+    if (
+      !url.includes('duckduckgo') &&
+      !url.includes('google.com') &&
+      !url.includes('bing.com') &&
+      !url.includes('ads') &&
+      url.length < 200
+    ) {
+      // Prioritize known hackathon platforms
+      const priority = keywords.some(k => url.includes(k)) ? 0 : 1;
+      matches.push({ url, priority });
+    }
+  }
+
+  // Sort by priority (hackathon platforms first)
+  matches.sort((a, b) => a.priority - b.priority);
+
+  // Return unique URLs
+  return [...new Map(matches.map(m => [m.url, m])).values()]
+    .map(m => m.url)
+    .slice(0, 5);
+};
+
+export const searchHackathonUrl = async (name) => {
+  console.log(`🔎 Searching for hackathon: "${name}"...`);
+
+  const query = `${name} hackathon site:devpost.com OR site:devfolio.co OR site:hackerearth.com OR site:unstop.com`;
+
+  try {
+    const { data: html } = await axios.get(SEARCH_ENGINES[0](query), {
+      timeout: 10000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9',
+      }
+    });
+
+    const urls = extractUrlsFromHtml(html, name);
+
+    if (urls.length === 0) {
+      throw new Error(`No URLs found for "${name}"`);
+    }
+
+    console.log(`✅ Found ${urls.length} candidate URL(s)`);
+    console.log(`🎯 Best match: ${urls[0]}`);
+
+    return urls[0];
+
+  } catch (err) {
+    throw new Error(`❌ Search failed for "${name}": ${err.message}`);
+  }
+};
+
+// ─── Main router — resolves any input to a URL ────────────────────────────────
+export const resolveInput = async (input) => {
+  const trimmed = input.trim();
+  const type = detectInputType(trimmed);
+
+  if (type === 'url') {
+    console.log(`🔗 Direct URL detected: ${trimmed}`);
+    return trimmed;
+  }
+
+  console.log(`📝 Hackathon name detected: "${trimmed}"`);
+  return await searchHackathonUrl(trimmed);
+};

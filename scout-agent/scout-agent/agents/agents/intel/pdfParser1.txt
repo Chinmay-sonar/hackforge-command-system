@@ -1,0 +1,68 @@
+import axios from 'axios';
+import pdfParse from 'pdf-parse/lib/pdf-parse.js';
+
+// ─── Download PDF as buffer ───────────────────────────────────────────────────
+const downloadPdf = async (url) => {
+  console.log('📄 Downloading PDF:', url);
+  const response = await axios.get(url, {
+    responseType: 'arraybuffer',
+    timeout: 20000,
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36',
+    }
+  });
+  return Buffer.from(response.data);
+};
+
+// ─── Extract text from PDF buffer ────────────────────────────────────────────
+const extractPdfText = async (buffer) => {
+  const data = await pdfParse(buffer);
+  return {
+    text: data.text.replace(/\s+/g, ' ').trim(),
+    pages: data.numpages,
+    info: data.info,
+  };
+};
+
+// ─── Main PDF parser ──────────────────────────────────────────────────────────
+export const parsePdfFromUrl = async (url) => {
+  try {
+    const buffer = await downloadPdf(url);
+    const { text, pages, info } = await extractPdfText(buffer);
+
+    console.log(`✅ PDF parsed — ${pages} page(s), ${text.length} chars extracted`);
+
+    return {
+      success: true,
+      url,
+      pages,
+      info,
+      text: text.slice(0, 8000), // cap for LLM
+    };
+  } catch (err) {
+    console.warn(`⚠️  PDF parse failed for ${url}: ${err.message}`);
+    return {
+      success: false,
+      url,
+      text: '',
+      error: err.message,
+    };
+  }
+};
+
+// ─── Parse multiple PDFs and merge text ──────────────────────────────────────
+export const parseAllPdfs = async (pdfLinks = []) => {
+  if (pdfLinks.length === 0) return '';
+
+  console.log(`📚 Found ${pdfLinks.length} PDF(s) to parse...`);
+
+  const results = await Promise.allSettled(
+    pdfLinks.slice(0, 3).map(link => parsePdfFromUrl(link.href)) // max 3 PDFs
+  );
+
+  const texts = results
+    .filter(r => r.status === 'fulfilled' && r.value.success)
+    .map(r => `\n\n--- PDF: ${r.value.url} ---\n${r.value.text}`);
+
+  return texts.join('\n');
+};

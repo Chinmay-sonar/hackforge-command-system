@@ -1,0 +1,155 @@
+import fs from 'fs';
+import path from 'path';
+
+// ─── Colors for terminal ──────────────────────────────────────────────────────
+const c = {
+  reset:  '\x1b[0m',
+  bright: '\x1b[1m',
+  dim:    '\x1b[2m',
+  green:  '\x1b[32m',
+  yellow: '\x1b[33m',
+  cyan:   '\x1b[36m',
+  blue:   '\x1b[34m',
+  magenta:'\x1b[35m',
+  red:    '\x1b[31m',
+  white:  '\x1b[37m',
+};
+
+const line  = () => console.log(`${c.dim}${'─'.repeat(60)}${c.reset}`);
+const title = (t) => console.log(`\n${c.bright}${c.cyan}${t}${c.reset}`);
+const label = (l, v) => v && console.log(`  ${c.yellow}${l}:${c.reset} ${c.white}${v}${c.reset}`);
+const badge = (text, color = c.green) => `${color}[${text}]${c.reset}`;
+
+// ─── Print full intel report to terminal ─────────────────────────────────────
+export const printReport = (intel) => {
+  console.clear();
+  line();
+  console.log(`${c.bright}${c.magenta}
+  ██╗███╗   ██╗████████╗███████╗██╗     
+  ██║████╗  ██║╚══██╔══╝██╔════╝██║     
+  ██║██╔██╗ ██║   ██║   █████╗  ██║     
+  ██║██║╚██╗██║   ██║   ██╔══╝  ██║     
+  ██║██║ ╚████║   ██║   ███████╗███████╗
+  ╚═╝╚═╝  ╚═══╝   ╚═╝   ╚══════╝╚══════╝
+  ${c.reset}`);
+  console.log(`${c.bright}${c.cyan}        🕵️  HACKATHON INTEL REPORT${c.reset}`);
+  line();
+
+  // ── Overview ──
+  title('📌 OVERVIEW');
+  label('Name',     intel.name);
+  label('Tagline',  intel.tagline);
+  label('Location', `${intel.location?.type?.toUpperCase()} ${intel.location?.place ? '— ' + intel.location.place : ''}`);
+  label('Source',   intel.sourceUrl);
+  label('Scraped',  new Date(intel.scrapedAt).toLocaleString());
+
+  // ── Dates ──
+  title('📅 DATES');
+  label('Start',                intel.dates?.start);
+  label('End',                  intel.dates?.end);
+  label('Registration Deadline',intel.dates?.registrationDeadline);
+  label('Submission Deadline',  intel.dates?.submissionDeadline);
+
+  // ── Themes ──
+  if (intel.themes?.length > 0) {
+    title('🎯 THEMES / TRACKS');
+    intel.themes.forEach(t => console.log(`  ${c.green}▸${c.reset} ${t}`));
+  }
+
+  // ── Prizes ──
+  if (intel.prizes?.length > 0) {
+    title('🏆 PRIZES');
+    intel.prizes.forEach(p =>
+      console.log(`  ${c.yellow}${p.position}:${c.reset} ${c.white}${p.reward}${c.reset}`)
+    );
+  }
+
+  // ── Team Size ──
+  title('👥 TEAM SIZE');
+  const ts = intel.teamSize;
+  if (ts?.min || ts?.max) {
+    label('Size', `${ts.min ?? '?'} – ${ts.max ?? '?'} members`);
+  } else {
+    console.log(`  ${c.dim}Not specified${c.reset}`);
+  }
+
+  // ── Eligibility ──
+  title('✅ ELIGIBILITY');
+  label('Who can join', intel.eligibility?.whoCanParticipate);
+  if (intel.eligibility?.restrictions?.length > 0) {
+    intel.eligibility.restrictions.forEach(r =>
+      console.log(`  ${c.red}✗${c.reset} ${r}`)
+    );
+  }
+
+  // ── Submission Requirements ──
+  if (intel.submissionRequirements?.length > 0) {
+    title('📦 SUBMISSION REQUIREMENTS');
+    intel.submissionRequirements.forEach(s =>
+      console.log(`  ${c.cyan}▸${c.reset} ${s}`)
+    );
+  }
+
+  // ── Judging Criteria ──
+  if (intel.judgingCriteria?.length > 0) {
+    title('⚖️  JUDGING CRITERIA');
+    intel.judgingCriteria.forEach(j =>
+      console.log(`  ${c.magenta}▸${c.reset} ${j.criterion}${j.weight ? c.dim + ' (' + j.weight + ')' + c.reset : ''}`)
+    );
+  }
+
+  // ── Tech Stack ──
+  title('🛠️  TECH STACK');
+  if (intel.techStack?.mandatoryAPIs?.length > 0) {
+    console.log(`  ${c.red}Mandatory APIs:${c.reset}`);
+    intel.techStack.mandatoryAPIs.forEach(t => console.log(`    ${c.red}▸${c.reset} ${t}`));
+  }
+  if (intel.techStack?.suggestedTools?.length > 0) {
+    console.log(`  ${c.green}Suggested Tools:${c.reset}`);
+    intel.techStack.suggestedTools.forEach(t => console.log(`    ${c.green}▸${c.reset} ${t}`));
+  }
+  if (intel.techStack?.sponsorTech?.length > 0) {
+    console.log(`  ${c.yellow}Sponsor Tech:${c.reset}`);
+    intel.techStack.sponsorTech.forEach(t => console.log(`    ${c.yellow}▸${c.reset} ${t}`));
+  }
+
+  // ── Important Links ──
+  title('🔗 IMPORTANT LINKS');
+  label('Register',       intel.importantLinks?.register);
+  label('Submit Project', intel.importantLinks?.submitProject);
+  label('Discord',        intel.importantLinks?.discord);
+  label('Devpost',        intel.importantLinks?.devpost);
+  if (intel.importantLinks?.others?.length > 0) {
+    intel.importantLinks.others.forEach(l =>
+      console.log(`  ${c.blue}▸${c.reset} ${l}`)
+    );
+  }
+
+  // ── Summary ──
+  title('📝 SUMMARY');
+  console.log(`  ${c.dim}${intel.rawSummary}${c.reset}`);
+
+  line();
+  console.log(`${c.bright}${c.green}  ✅ Intel extraction complete!${c.reset}`);
+  line();
+};
+
+// ─── Save JSON report to file ─────────────────────────────────────────────────
+export const saveReport = (intel, outputDir = './reports') => {
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+
+  const safeName = (intel.name || 'hackathon')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .slice(0, 40);
+
+  const timestamp = new Date().toISOString().slice(0, 10);
+  const filename = `${safeName}-${timestamp}.json`;
+  const filepath = path.join(outputDir, filename);
+
+  fs.writeFileSync(filepath, JSON.stringify(intel, null, 2), 'utf-8');
+  console.log(`\n💾 Report saved → ${c.cyan}${filepath}${c.reset}`);
+  return filepath;
+};
