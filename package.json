@@ -5,6 +5,7 @@
   "type": "module",
   "main": "scout-agent/src/cli.js",
   "scripts": {
+    "test": "node --test tests/**/*.test.js",
     "scout": "node scout-agent/src/cli.js",
     "strategy": "node strategy-index.js",
     "action": "node action-index.js",
